@@ -53,6 +53,7 @@
 (defsig multi-process-cpu [^String q] .getMultiProcCpu)
 (defsig multi-process-memory [^String q] .getMultiProcMem)
 (defsig native-library [] .getNativeLibrary)
+(defsig net-info [] .getNetInfo)
 (defsig net-ifconfig [^String name] .getNetInterfaceConfig)
 (defsig net-ifstat [^String name] .getNetInterfaceStat)
 (defsig net-listen-addr [port] .getNetListenAddress)
