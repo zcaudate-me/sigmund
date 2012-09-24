@@ -1,6 +1,27 @@
 (ns sigmund.util
   (:require [clojure.string :as st]))
 
+
+;; Human Readable Bytes
+
+(def UNITS ["" "K" "M" "G" "T"])
+
+(defn down-shift [num] (bit-shift-right num 10))
+
+(defn up-shift [num] (bit-shift-left num 10))
+
+(defn human-readable
+  ([bytes] (human-readable bytes 0))
+  ([bytes n]
+     (loop [val bytes
+            cnt 0]
+       (let [nval  (down-shift val)
+             nnval (first (drop n (iterate down-shift nval)))]
+         (cond (zero? (or nnval nval)) (str val (nth UNITS cnt))
+               :else (recur nval (inc cnt)))))))
+
+;; Conversion into clojure objects
+
 (defn lower-case [c]
   (str (.toLowerCase c)))
 
@@ -11,13 +32,6 @@
         hs  (st/replace ccs #"[A-Z]"      ;;  "sayHi"      -> "say<c>hi"
                         (fn [x] (str "-" (lower-case x))))]
     hs))
-
-(defn map->hashmap [m]
-  (assoc (into {} m) "key" "value")
-
-  )
-
-
 
 (defmulti <clj (fn [obj] (type obj)))
 (defmethod <clj String [obj] obj)

@@ -1,7 +1,8 @@
 (ns sigmund.sigar
   (:use [sigmund.util :only [<clj]] )
   (:import org.hyperic.sigar.Sigar
-           org.hyperic.sigar.NetFlags))
+           org.hyperic.sigar.NetFlags
+           org.hyperic.sigar.OperatingSystem))
 
 (def ^:dynamic *sigar* (Sigar.))
 (def TCP NetFlags/CONN_TCP)
@@ -33,6 +34,12 @@
      (<clj (.getNfsServerV2 *sigar*))
      (catch Exception e (println e)))))
 
+(defn fs-map []
+  (map <clj (.values (.getFileSystemMap *sigar*))))
+
+(defn os-info []
+  (<clj (OperatingSystem/getInstance)))
+
 (defsig cpu-stats [] .getCpu)
 (defsig cpu-percentages [] .getCpuPerc)
 (defsig dir-stats [^String f] .getDirStat)
@@ -41,7 +48,6 @@
 (defsig link-info [^String f] .getLinkInfo)
 (defsig mounted-fs-usage [^String f] .getMountedFileSystemUsage)
 (defsig fs-usage [^String f] .getFileSystemUsage)
-(defsig fs-map [] .getFileSystemMap)
 (defsig fqdn [] .getFQDN)
 (defsig memory-info [] .getMem)
 (defsig multi-process-cpu [^String q] .getMultiProcCpu)
