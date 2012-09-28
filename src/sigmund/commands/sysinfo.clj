@@ -3,5 +3,5 @@
   (:require [sigmund.sigar :as sig]
             [clojure.pprint :as pp]))
 
-(pp/pprint (sig/os-info))
-(pp/pprint (sig/proc-stats))
+(pp/pprint (sig/os))
+(pp/pprint (sig/os-processes))

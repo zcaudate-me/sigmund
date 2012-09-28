@@ -20,7 +20,7 @@
      :idle   (fmt-fn :idle)}))
 
 (defn cpu-load []
-  (let [cpu-list (sig/all-cpu-percentages)
+  (let [cpu-list (sig/cpu-usages-norm)
         cpu-avg  (apply merge-with avg-fn (map #(dissoc % :class) cpu-list)) ]
     (conj
      (map-indexed (fn [i cpu-e]

@@ -20,8 +20,8 @@
    :used-pct (format "%.1f%%" (/ (:used s-e) (:total s-e) 1.))})
 
 (defn free []
-  (let [mem (sig/memory-info)
-        swp (sig/swap-info)]
+  (let [mem (sig/os-memory)
+        swp (sig/os-swap)]
     (list
       (mem-stats mem)
       (swap-stats swp))))

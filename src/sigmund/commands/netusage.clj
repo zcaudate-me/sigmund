@@ -7,8 +7,8 @@
 (def *network-status* (atom nil))
 
 (defn current-network-status []
-  (let [status     (->> (sig/all-net-interfaces)
-                        (map (fn [x] (assoc (sig/net-ifstat x) :name x)))
+  (let [status     (->> (sig/net-if-names)
+                        (map (fn [x] (assoc (sig/net-if-usage x) :name x)))
                         (map #(select-keys % [:name :tx-bytes :rx-bytes])))
         all-status (apply merge-with +
                           (map #(select-keys % [:tx-bytes :rx-bytes]) status))]

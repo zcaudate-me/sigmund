@@ -19,7 +19,7 @@
      :mounted  (:dir-name fs-e)}))
 
 (defn df []
-  (map df-entry sig/fs-map))
+  (map df-entry (sig/fs-devices)))
 
 (defn print-df []
   (pp/print-table ATTRIBUTES (df)))
