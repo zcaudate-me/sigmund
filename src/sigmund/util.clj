@@ -41,16 +41,20 @@
 (defmethod <clj java.util.List [obj] (seq obj))
 (defmethod <clj Object [obj]
   (let [c (. obj (getClass))
-        pmap (reduce (fn [m ^java.beans.PropertyDescriptor pd]
-                         (let [name (. pd (getName))
-                               method (. pd (getReadMethod))]
-                           (if (and method (zero? (alength (. method (getParameterTypes)))))
-                             (assoc m (keyword (decamelcase name)) (fn [] (clojure.lang.Reflector/prepRet (.getPropertyType pd) (. method (invoke obj nil)))))
-                             m)))
-                     {}
-                     (seq (.. java.beans.Introspector
-                              (getBeanInfo c)
-                              (getPropertyDescriptors))))
+        pmap (-> (reduce (fn [m ^java.beans.PropertyDescriptor pd]
+                           (let [name (. pd (getName))
+                                 method (. pd (getReadMethod))]
+                             (if (and method (zero? (alength (. method (getParameterTypes)))))
+                               (assoc m
+                                 (keyword (decamelcase name))
+                                 (fn [] (clojure.lang.Reflector/prepRet
+                                        (.getPropertyType pd) (. method (invoke obj nil)))))
+                               m)))
+                         {}
+                         (seq (.. java.beans.Introspector
+                                  (getBeanInfo c)
+                                  (getPropertyDescriptors))))
+                 (dissoc :class))
         v (fn [k] ((pmap k)))
         snapshot (fn []
                    (reduce (fn [m e]
@@ -71,3 +75,14 @@
                    (when-let [pseq (seq plseq)]
                      (cons (new clojure.lang.MapEntry (first pseq) (v (first pseq)))
                            (thisfn (rest pseq)))))) (keys pmap))))))
+
+(defn de-get [m-str]
+  (decamelcase (st/replace m-str #"^get" "")))
+
+(defn de-is [m-str]
+  (str (decamelcase (st/replace m-str #"^is" "")) "?"))
+
+(defn de-java [m-str]
+  (cond (re-find #"^get[A-Z]" m-str) (de-get m-str)
+        (re-find #"^is[A-Z]" m-str) (de-is m-str)
+        :else (decamelcase m-str)))

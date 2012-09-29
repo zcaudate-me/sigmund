@@ -20,7 +20,8 @@
         rx-fn #(:rx-bytes (second %))
         t-diff (/ (- (t-fn inst1) (t-fn inst0)) 1000.)]
     {:tx-rate (str (human-readable (long (/ (- (tx-fn inst1) (tx-fn inst0)) t-diff)) 1) "bps")
-     :rx-rate (str (human-readable (long (/ (- (rx-fn inst1) (rx-fn inst0)) t-diff)) 1) "bps")}))
+     :rx-rate (str (human-readable (long (/ (- (rx-fn inst1) (rx-fn inst0)) t-diff)) 1) "bps")
+     :time (long (* 1000 t-diff))}))
 
 (defn rough-bandwidth []
   (cond (nil? @*network-status*)
@@ -36,4 +37,5 @@
           (swap! *network-status* (fn [_] nnetwork-status))
           bandwidth)))
 
+(println *network-status*)
 (rough-bandwidth)

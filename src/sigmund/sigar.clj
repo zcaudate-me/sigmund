@@ -1,10 +1,13 @@
 (ns sigmund.sigar
-  (:use [sigmund.util :only [<clj]] )
-  (:import org.hyperic.sigar.Sigar
-           org.hyperic.sigar.NetFlags
-           org.hyperic.sigar.OperatingSystem))
+  (:use [sigmund.util :only [<clj de-java]] )
+  (:import java.util.Date
+           [java.net InetAddress]
+           [ java.lang.management ManagementFactory RuntimeMXBean]
+           [org.hyperic.sigar Sigar NetFlags OperatingSystem]))
 
 (def ^:dynamic *sigar* (Sigar.))
+(def ^:dynamic *net-usage* (atom nil))
+
 (def TCP NetFlags/CONN_TCP)
 (def UDP NetFlags/CONN_UDP)
 
@@ -12,11 +15,25 @@
   `(defn ~name ~doc-string ~args
      (<clj (~func *sigar* ~@args))))
 
+(defmacro defsigps [name doc-string args func]
+  `(defn ~name ~doc-string
+     (~args
+      (assoc (<clj (~func *sigar* ~@args)) :pid (first ~args)))
+     ([]
+        (~name ~'(pid)))))
+
 (defmacro defsiglist [name doc-string args func]
   `(defn ~name ~doc-string ~args
     (->> (~func *sigar* ~@args) (map <clj))))
 
-(defn nfs-client []
+;; nfs
+
+(defn nfs-client
+  "Returns information for the network file system client.
+   Map keys:   [:access :class :commit :create :fsinfo :fsstat :getattr
+                :link :lookup :mkdir :mknod :null :pathconf :read :readdir
+                :readdirplus :readlink :remove :rename :rmdir :setattr :symlink :write]"
+  []
   (or
    (try
      (<clj (.getNfsClientV3 *sigar*))
@@ -26,6 +43,10 @@
      (catch Exception e (println e)))))
 
 (defn nfs-server []
+  "Returns information for the network file system server.
+   Map keys:   [:access :class :commit :create :fsinfo :fsstat :getattr
+                :link :lookup :mkdir :mknod :null :pathconf :read :readdir
+                :readdirplus :readlink :remove :rename :rmdir :setattr :symlink :write]"
   (or
    (try
      (<clj (.getNfsServerV3 *sigar*))
@@ -71,7 +92,7 @@
 
 (defsig os-limits
   "Returns system resource limits.
-   Map keys   [:core-cur :core-max :cpu-cur :cpu-max :data-cur :data-max :file-size-cur
+   Map keys:  [:core-cur :core-max :cpu-cur :cpu-max :data-cur :data-max :file-size-cur
                :file-size-max :memory-  cur :memory-max :open-files-cur :open-files-max
                :pipe-size-cur :pipe-size-max :processes-cur :processes-max :stack-cur
                :stack-max :virtual-memory-cur :virtual-memory-max]"
@@ -79,66 +100,72 @@
 
 (defsig os-uptime
   "Returns system uptime
-   Map keys: [uptime]"
+   Map keys:  [uptime]"
   [] .getUptime)
 
 (defsiglist os-who
   "Returns list of users."
   [] .getWhoList)
 
+;; JVM
+
+(defn jvm
+  "Returns the jvm profile for the calling thread.
+   Map keys:   [:boot-class-path :boot-class-path-supported? :class-path
+                :input-arguments :library-path :management-spec-version
+                :name :spec-name :spec-vendor :spec-version :start-time
+                :system-properties :uptime :vm-name :vm-vendor :vm-version]"
+  []
+  (let [methods (.getMethods RuntimeMXBean)
+        jvm-impl (ManagementFactory/getRuntimeMXBean)
+        names   (map (fn [x] (de-java (.getName x))) methods)
+        results (map (fn [x] (.invoke x jvm-impl nil)) methods)]
+    (zipmap (map keyword names) results)))
 
 ;; CPU
 
-(defsiglist cpus
+(defsiglist cpu
   "Returns a list containing information about the system CPUs.
    Map keys:   [:cache-size :cores-per-socket :mhz :mhz-max :mhz-min
                 :model :total-cores :total-sockets :vendor"
   [] .getCpuInfoList)
 
-(defsig cpu-usage
-  "Returns the averaged CPU usage time in cpu ticks.
-   Map keys:   [:nice :soft-irq :idle :irq :user
-                :sys :wait :stolen :total]"
-  [] .getCpu)
-
-(defsig cpu-usage-norm
-  "Returns the averaged CPU usage times normalised to total usage.
-   Map keys:   [:nice :soft-irq :idle :irq :user
-                :sys :wait :stolen :combined]"
-  [] .getCpuPerc)
-
-(defsiglist cpu-usages
-  "Returns a list of individual CPU usage times for each processor.
-   Map keys:   [:nice :soft-irq :idle :irq :user
-                :sys :wait :stolen :total]"
-  [] .getCpuList)
-
-(defsiglist cpu-usages-norm
-  "Returns a list of normalized individual CPU usage times for each processor.
-   Map keys:   [:nice :soft-irq :idle :irq :user
-                :sys :wait :stolen :combined]"
-  [] .getCpuPercList)
+(defn cpu-usage [& flags]
+  "Returns CPU usage, Additional flags are:
+      :absolute, which returns the usage in absolute terms instead of percentages.
+      :average, which returns the average usage time of all cpus.
+   Map keys:  [:nice :soft-irq :idle :irq :user
+                :sys :wait :stolen]
+    flag keys:  [:combined (:absolute off) or :total (:absolute on)]"
+  (let [flags  (apply hash-set flags)
+        abs?   (contains? flags :absolute)
+        avg?   (contains? flags :average)]
+    (cond (and abs? avg?) (<clj (.getCpu *sigar*))
+          avg?            (<clj (.getCpuPerc *sigar*))
+          abs?            (->> (.getCpuList *sigar*) (map <clj))
+          :else           (->> (.getCpuPercList *sigar*) (map <clj)))))
 
 (defsig cpu-current-thread
   "Returns the overall cpu usage in ticks for the calling thread
    Map keys:  [:user :total :sys]"
   [] .getThreadCpu)
 
-
 ;; File System
 
-(defn fs-devices
+(defn fs
   "Returns a list of the mounted devices
-   Map keys    [:dev-name :dir-name :flags :options
+   Map keys:   [:dev-name :dir-name :flags :options
                 :sys-type-name :type :type-name]"
   [] (map <clj (.values (.getFileSystemMap *sigar*))))
 
-(defsig fs-usage
-  "Returns the filesystem usage for a specified path.
+(defn fs-usage
+  "Returns the filesystem usage for either a specified path, or for all
+   mounted devices the input is empty.
    Map keys:   [:avail :class :disk-queue :disk-read-bytes :disk-reads
                 :disk-service-time :disk-write-bytes :disk-writes
                 :files :free :free-files :total :use-percent :used]"
-  [^String f] .getFileSystemUsage)
+  ([^String f] (<clj (.getFileSystemUsage *sigar* f)))
+  ([] (map #(fs-usage (:dir-name %)) (fs-devices) )))
 
 (defsig fs-mounted-usage
   "Returns the filesystem usage for a specified path or an error if the path is not
@@ -177,32 +204,29 @@
                 :size :type :type-char :type-string :uid]"
   [^String f] .getLinkInfo)
 
-
 ;; Network
 
 (defsig net-fqdn
   "Returns the Fully Qualified Domain Name for the System"
   [] .getFQDN)
 
-
 (defsiglist net-connections
   "Returns a list of network connections that have been initiated
    on a particular port. ie. 21, 22.
-   Map keys   [:local-address :local-port :receive-queue
+   Map keys:  [:local-address :local-port :receive-queue
                :remote-address :remote-port :send-queue
                :state :state-string :type :type-string]"
   [^Integer port] .getNetConnectionList)
 
-
 (defsiglist net-routes
   "Returns the list of network routes currently used by the system.
-   Map keys   [:destination :flags :gateway :ifname :irtt
+   Map keys:  [:destination :flags :gateway :ifname :irtt
                :mask :metric :mtu :refcnt :use :window]"
   [] .getNetRouteList)
 
 (defsig net-gateway
   "Returns the network gateway and the dns information.
-   Map keys   [:default-gateway :default-gateway-interface :domain-name
+   Map keys:  [:default-gateway :default-gateway-interface :domain-name
                :host-name :primary-dns :secondary-dns]"
   [] .getNetInfo)
 
@@ -210,19 +234,52 @@
   "Returns the names of the network interfaces on the system."
   [] .getNetInterfaceList)
 
-(defsig net-if-info
+(defn net-if-info
   "Returns the configuration information for the specified network interface.
-   Map keys   [:address :address6 :broadcast :class :description
+   Map keys:  [:address :address6 :broadcast :class :description
                :destination :flags :hwaddr :metric :mtu :name
                :netmask :prefix6-length :scope6 :tx-queue-len :type]"
-  [^String name] .getNetInterfaceConfig)
+  ([^String name] (<clj (.getNetInterfaceConfig *sigar* name)))
+  ([] (map net-if-info (net-if-names))))
 
-(defsig net-if-usage
+(defn net-if-usage
   "Returns the data usage information for the network interface
-   Map keys   [:rx-bytes :rx-dropped :rx-errors :rx-frame :rx-overruns
+   Map keys:  [:rx-bytes :rx-dropped :rx-errors :rx-frame :rx-overruns
                :rx-packets :speed :tx-bytes :tx-carrier :tx-collisions
                :tx-dropped :tx-errors :tx-overruns :tx-packets]"
-  [^String name] .getNetInterfaceStat)
+  ([^String name]
+     (-> (<clj (.getNetInterfaceStat *sigar* name))
+         (assoc :name name)
+         (dissoc :speed)))
+  ([] (map net-if-usage (net-if-names))))
+
+(defn net-usage
+  "Returns the overall data usage for all network interfaces
+   Map keys:  [:tx-bytes :rx-bytes :tx-packets :rx-packets]"
+  [] (->> (net-if-usage)
+          (map #(select-keys % [:tx-bytes :rx-bytes :tx-packets :rx-packets]))
+          (apply merge-with +)))
+
+(defn net-bandwidth
+  "Returns the overall data transmission in bytes per second and packets per second
+   for all network interfaces
+   Map keys:  [:tx-bytes :rx-bytes :tx-packets :rx-packets]"
+  [& [stime]]
+  (let [usage-fn (constantly [(Date.) (net-usage)])]
+    (cond (or (nil? @*net-usage*) stime)
+          (do
+            (swap! *net-usage* usage-fn)
+            (Thread/sleep (or stime 200))
+            (net-bandwidth))
+
+          :else
+          (let [t-fn       (fn [i] (.getTime (first i)))
+                curr-usage (usage-fn)
+                t-diff     (- (t-fn curr-usage) (t-fn @*net-usage*))
+                merge-fn  #(long ( / (- %1 %2) t-diff 0.001))
+                bandwidth  (merge-with merge-fn (second curr-usage) (second @*net-usage*))]
+            (swap! *net-usage* (constantly curr-usage))
+            (assoc bandwidth :interval t-diff)))))
 
 (defsig net-listen-addr
   "Returns the network address that is being listened to on the port"
@@ -230,7 +287,7 @@
 
 (defsig net-tcp
   "Returns summarf information for tcp on the system
-   Map keys   [:active-opens :attempt-fails :curr-estab
+   Map keys:  [:active-opens :attempt-fails :curr-estab
                :estab-resets :in-errs :in-segs :out-rsts
                :out-segs :passive-opens :retrans-segs]"
   [] .getTcp)
@@ -244,59 +301,71 @@
                tcp-syn-recv :tcp-syn-sent :tcp-time-wait]"
   [] .getNetStat)
 
+(defn net-is-reachable?
+  "Returns whether an ip is reachable by the current system"
+  [ip]
+  (.isReachable (InetAddress/getByName ip) 300))
+
+(defn net-localhost []
+  "Returns the localhost by the current system"
+  (InetAddress/getLocalHost))
+
 ;; Processes
 
 (defsig pid
   "Returns the process id of the current calling thread."
   [] .getPid)
 
-(defsiglist ps-args
-  "Returns the list of arguments given to the process."
-  [^Long pid] .getProcArgs)
+(defn ps-args
+  "Returns the list of arguments given to the specified process or the current process if empty."
+  ([^Long pid] (->> (.getProcArgs *sigar* pid) (map <clj)))
+  ([] (ps-args (pid))))
 
-(defsig ps-cpu
-  "Returns the cpu usage by the specified process
+(defsigps ps-cpu
+  "Returns the cpu usage by the specified process or the current process if empty.
    Map keys:  [:last-time :percent :start-time :sys :total :user]"
   [^Long pid] .getProcCpu)
 
-(defsig ps-cred
-  "Returns the system credentials of the specified process
+(defsigps ps-cred
+  "Returns the system credentials of the specified process or the current process if empty.
    Map keys:  [:egid :euid :gid :uid]"
   [^Long pid] .getProcCred)
 
-(defsig ps-cred-name
-  "Returns the system credential names of the specified process.
+(defsigps ps-cred-name
+  "Returns the system credential names of the specified process or the current process if empty.
    Map keys:  [:group :user]"
   [^Long pid] .getProcCredName)
 
-(defsig ps-env
-  "Returns the enviroment variables of the specified process."
+(defsigps ps-env
+  "Returns the enviroment variables of the specified process or the current process if empty."
   [^Long pid] .getProcEnv)
 
-(defsig ps-exe
-  "Returns the executable name and current working directory.
+(defsigps ps-exe
+  "Returns the executable name and current working directory of the specified process or the current process if empty.
    Map keys:   [:cwd :name]"
   [^Long pid] .getProcExe)
 
-(defsig ps-memory
-  "Returns the memory states of the specified process.
+(defsigps ps-memory
+  "Returns the memory states of the specified process or the current process if empty.
    Map keys:   [:major-faults :minor-faults :page-faults
                 :resident :rss :share :size :vsize]"
   [^Long pid] .getProcMem)
 
-(defsig ps-info
-  "Returns running status of the process
+(defsigps ps-info
+  "Returns running status of the specified process or the current process if empty.
    Map keys:   [:name :nice :ppid :priority :processor :state :threads :tty]"
   [^Long pid] .getProcState)
 
-(defn ps-ancestors [pid]
-  "Returns running status for all ancestors of the process
+(defn ps-ancestors
+  "Returns running status for all ancestors of the specified process or the current process if empty.
    Map keys:   [:name :nice :ppid :priority :processor :state :threads :tty]"
-  (loop [acc# () id# pid]
-    (cond (> 1 id#) acc#
-          :else
-          (if-let [state (ps-info id#)]
-            (recur (cons id# acc#) (:ppid state))))))
+  ([^Long pid]
+      (loop [acc# () id# pid]
+        (cond (> 1 id#) acc#
+              :else
+              (if-let [state (ps-info id#)]
+                (recur (cons id# acc#) (:ppid state))))))
+  ([] (ps-ancestors (pid))))
 
 (comment
   ;;(defsig native-library [] .getNativeLibrary)
@@ -306,6 +375,4 @@
   ;;(defsig multi-process-cpu [^String q] .getMultiProcCpu)
   ;;(defsig multi-process-memory [^String q] .getMultiProcMem)
   ;;(defsig net-service-name [protocol port] .getNetServicesName)
-  (defsig ps-time
-    ":start-time :sys :total :user"
-    [^Long pid] .getProcTime))
+)
