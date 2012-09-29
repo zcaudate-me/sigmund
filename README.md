@@ -1,10 +1,10 @@
 # sigmund
 
+<pre>
 "Sometimes a sigar is just a sigar" - a misquote attributed to Mr Freud
+</pre>
 
-Sigmund is friendly clojure wrapper around the Hyperic SIGAR API http://www.hyperic.com/products/sigar
-
-Sigmund can tell you all sorts of information about your current process and system. It provides quite a bit more information than JMX:
+Sigmund is friendly clojure wrapper around the Hyperic SIGAR API http://www.hyperic.com/products/sigar. It can tell you all sorts of information about your currently executing process as well as the system that you are working on. It provides quite a bit more information than JMX:
 
  - os:          information, processes, memory, swap, resource limits, uptime and logins.
  - cpu:         information, per cpu and average usage.
@@ -26,7 +26,7 @@ The methods are pretty straight forward and comes with documentated code. Sigar 
 
     > (require '[sigmund.core :as sig])
 
-Processes:
+### Processes:
 
     > (sig/pid)
     ;; => 6606
@@ -70,7 +70,7 @@ Processes:
     ;; => {:pid 1, :last-time 1348898639103, :percent 0.0,
            :start-time 1348864986380, :sys 20737, :total 20915, :user 178}
 
-OS:
+### OS:
 
     > (sig/os)
     ;; => {:data-model "64", :machine "i386", :name "MacOSX",
@@ -93,7 +93,7 @@ OS:
     > (sig/jvm)
     ;; => ..... All the stuff provided by the java.lang.management.RuntimeMXBean....
 
-CPU
+### CPU:
 
     > (sig/cpu)
     ({:model "MacBook5,1", :cores-per-socket 2, :mhz-min 2000, :mhz 2000,
@@ -119,7 +119,7 @@ CPU
     > (sig/cpu-current-thread)
     ;; => {:user 7377000, :total 7924000, :sys 547000}
 
-FileSystem
+### File System:
 
     > (sig/fs-devices)
     ;; => ({:type-name "local", :type 2, :sys-type-name "msdos",
@@ -151,7 +151,7 @@ FileSystem
            :type 2, :mtime 1348043675000, :permissions 1877,
            :type-string "directory", :mode 755}
 
-Network
+### Network:
 
     > sigmund.test-core=> (sig/net-usage)
     ;; => {:rx-packets 92554, :tx-packets 93789, :rx-bytes 26899792, :tx-bytes 18938536}
