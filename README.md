@@ -20,6 +20,8 @@ In your project.clj, add to dependencies:
 
      [sigmund "0.1.0"]
 
+Sigmund comes with included with native dependencies for MacOSX and Windows. Linux users will have to compile the native binaries and follow the intructions here: https://github.com/zcaudate/sigar-native-deps
+
 ## Usage
 
 The methods are pretty straight forward and comes with documentated code. Sigar itself has a few incomplete functionalities depending upon the platform that it is running. However, it adds alot more functionality than what the JMX provides. Below is a pretty comphrehensive summary of methods run on my machine, it give a good indication of the usefulness of the tool for system diagnosis.
@@ -89,9 +91,6 @@ The methods are pretty straight forward and comes with documentated code. Sigar 
     ;; => {:used-percent 53.873634338378906, :used 2827116544, :total 4294967296,
            :ram 4096, :free-percent 46.126365661621094, :free 1467850752,
            :actual-used 2313854976, :actual-free 1981112320}
-
-    > (sig/jvm)
-    ;; => ..... All the stuff provided by the java.lang.management.RuntimeMXBean....
 
 ### CPU:
 
@@ -182,6 +181,36 @@ The methods are pretty straight forward and comes with documentated code. Sigar 
 
     > (sig/net-is-reachable? "www.google.com")
     ;; => true
+
+
+### JVM
+It has wrappers for all the JMX Beans:
+
+    > (sig/jvm-runtime)
+    ;; => ..... All the stuff provided by the java.lang.management.RuntimeMXBean....
+
+    > (sig/jvm-memory)
+    ;; => {:non-heap-memory-usage {:used 40746560, :max 186646528, :init 24317952, :committed 60465152},
+           :heap-memory-usage {:used 39103256, :max 129957888, :init 0, :committed 85000192},
+           :object-pending-finalization-count 0, :verbose? false}
+
+    > (sig/jvm-threads)
+    ;; => {:total-started-thread-count 147, :thread-contention-monitoring-supported? true, :find-deadlocked-threads nil,
+           :object-monitor-usage-supported? true, :current-thread-cpu-time 286337000, :thread-cpu-time-enabled? true,
+           :thread-count 11, :current-thread-user-time 282691000, :daemon-thread-count 3, :find-monitor-deadlocked-threads nil,
+           :current-thread-cpu-time-supported? true, :thread-cpu-time-supported? true, :peak-thread-count 13,
+           :all-thread-ids (95 20 19 18 17 16 15 6 3 2 1), :thread-contention-monitoring-enabled? false, :synchronizer-usage-supported? true}
+
+    > (sig/jvm-compilation)
+    ;; => {:total-compilation-time 23854, :compilation-time-monitoring-supported? true, :name "HotSpot 64-Bit Tiered Compilers"}
+
+    > (sig/thid)
+    ;; => 101
+
+    > (sig/th-info)
+    ;; => {:stack-trace [], :lock-info nil, :lock-owner-name nil, :blocked-time -1, :locked-synchronizers [],
+           :thread-state #<State RUNNABLE>, :locked-monitors [], :suspended false, :thread-id 130, :in-native false,
+           :waited-count 0, :lock-name nil, :lock-owner-id -1, :blocked-count 0, :thread-name "Swank Worker Thread", :waited-time -1}
 
 
 ## License

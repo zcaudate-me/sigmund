@@ -2,7 +2,9 @@
   (:use [sigmund.util :only [<clj de-java]] )
   (:import java.util.Date
            [java.net InetAddress]
-           [java.lang.management ManagementFactory RuntimeMXBean]
+           [java.lang.management ManagementFactory ClassLoadingMXBean CompilationMXBean
+            MemoryMXBean MemoryPoolMXBean MemoryManagerMXBean GarbageCollectorMXBean
+            RuntimeMXBean ThreadMXBean]
            [org.hyperic.sigar Sigar NetFlags OperatingSystem]))
 
 (def ^:dynamic *sigar* (Sigar.))
@@ -106,21 +108,6 @@
 (defsiglist os-who
   "Returns list of users."
   [] .getWhoList)
-
-;; JVM
-
-(defn jvm
-  "Returns the jvm profile for the calling thread.
-   Map keys:   [:boot-class-path :boot-class-path-supported? :class-path
-                :input-arguments :library-path :management-spec-version
-                :name :spec-name :spec-vendor :spec-version :start-time
-                :system-properties :uptime :vm-name :vm-vendor :vm-version]"
-  []
-  (let [methods (.getMethods RuntimeMXBean)
-        jvm-impl (ManagementFactory/getRuntimeMXBean)
-        names   (map (fn [x] (de-java (.getName x))) methods)
-        results (map (fn [x] (.invoke x jvm-impl nil)) methods)]
-    (zipmap (map keyword names) results)))
 
 ;; CPU
 
@@ -367,12 +354,91 @@
                 (recur (cons id# acc#) (:ppid state))))))
   ([] (ps-ancestors (pid))))
 
-(comment
-  ;;(defsig native-library [] .getNativeLibrary)
-  ;;(defsig proc-modules [^Long pid] .getProcModules)
-  ;;(defsig proc-port [^Integer protocol ^Long port] .getProcPort)
-  ;;(defsig proc-fd [^Long pid] .getProcFd)
-  ;;(defsig multi-process-cpu [^String q] .getMultiProcCpu)
-  ;;(defsig multi-process-memory [^String q] .getMultiProcMem)
-  ;;(defsig net-service-name [protocol port] .getNetServicesName)
-)
+;; Threads
+
+
+;; JVM
+
+(defn- jmx-wrapper [interface impl]
+  (let [methods (.getMethods interface)
+        a-methods (filter (fn [x] (and (nil? (seq (.getParameterTypes x)))
+                                      (not= java.lang.Void/TYPE (.getReturnType x)))) methods)
+        names   (map (fn [x] (de-java (.getName x))) a-methods)
+        results (map (fn [x]
+                       (try (.invoke x impl nil)
+                            (catch Exception e nil))) a-methods)]
+    (zipmap (map keyword names) (map <clj results))))
+
+(defn jvm-runtime
+  "Returns the jvm runtime status for the calling thread.
+   Map keys:   [:boot-class-path :boot-class-path-supported? :class-path
+                :input-arguments :library-path :management-spec-version
+                :name :spec-name :spec-vendor :spec-version :start-time
+                :system-properties :uptime :vm-name :vm-vendor :vm-version]"
+  []
+  (jmx-wrapper RuntimeMXBean (ManagementFactory/getRuntimeMXBean)))
+
+(defn jvm-threads
+  "Returns the thread pool status for the jvm.
+   Map keys:   [:all-thread-ids :current-thread-cpu-time :current-thread-cpu-time-supported?
+                :current-thread-user-time :daemon-thread-count :find-deadlocked-threads
+                :find-monitor-deadlocked-threads :object-monitor-usage-supported?
+                :peak-thread-count :synchronizer-usage-supported? :thread-contention-monitoring-enabled?
+                :thread-contention-monitoring-supported? :thread-count :thread-cpu-time-enabled?
+                :thread-cpu-time-supported? :total-started-thread-count]"
+  []
+  (jmx-wrapper ThreadMXBean (ManagementFactory/getThreadMXBean)))
+
+(defn jvm-memory
+  "Returns the memory status for the jvm.
+   Map keys:  [:heap-memory-usage :non-heap-memory-usage :object-pending-finalization-count :verbose?]"
+  []
+  (jmx-wrapper MemoryMXBean (ManagementFactory/getMemoryMXBean)))
+
+(defn jvm-memory-pools
+  "Returns memory pool status for the jvm.
+   Map keys:  [:collection-usage :collection-usage-threshold :collection-usage-threshold-count
+               :collection-usage-threshold-exceeded? :collection-usage-threshold-supported?
+               :memory-manager-names :name :peak-usage :type :usage :usage-threshold :usage-threshold-count
+               :usage-threshold-exceeded? :usage-threshold-supported? :valid?]"
+  []
+  (map #(jmx-wrapper MemoryPoolMXBean %)
+       (ManagementFactory/getMemoryPoolMXBeans)))
+
+(defn jvm-memory-managers
+  "Returns memory manager status for the jvm.
+   Map keys:  [:memory-pool-names :name :valid?]"
+  []
+  (map #(jmx-wrapper MemoryManagerMXBean %)
+       (ManagementFactory/getMemoryManagerMXBeans)))
+
+(defn jvm-compilation
+  "Returns compilation status for the jvm
+   Map keys:  [:compilation-time-monitoring-supported? :name :total-compilation-time]"
+  []
+  (jmx-wrapper CompilationMXBean (ManagementFactory/getCompilationMXBean)))
+
+(defn jvm-class-loading
+  "Returns class loading status for the jvm
+   Map keys:  [:loaded-class-count :total-loaded-class-count :unloaded-class-count :verbose?]"
+  []
+  (jmx-wrapper ClassLoadingMXBean (ManagementFactory/getClassLoadingMXBean)))
+
+(defn jvm-gc
+  "Returns garbage collector status for the jvm.
+   Map keys: [:collection-count :collection-time :memory-pool-names :name :valid?]"
+  []
+  (map #(jmx-wrapper GarbageCollectorMXBean %)
+       (ManagementFactory/getGarbageCollectorMXBeans)))
+
+(defn thid
+  "Return the current thread id in the jvm"
+  [] (.getId (Thread/currentThread)))
+
+(defn th-info
+  "Returns the  info for the specified thread in the jvm, or the current tid if there is no input
+   Map keys: [:blocked-count :blocked-time :in-native :lock-info :lock-name :lock-owner-id
+              :lock-owner-name :locked-monitors :locked-synchronizers :stack-trace :suspended
+              :thread-id :thread-name :thread-state :waited-count :waited-time]"
+  ([] (th-info (thid)))
+  ([thid] (<clj (.getThreadInfo (ManagementFactory/getThreadMXBean) thid))))
