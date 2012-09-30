@@ -266,7 +266,8 @@
                 merge-fn  #(long ( / (- %1 %2) t-diff 0.001))
                 bandwidth  (merge-with merge-fn (second curr-usage) (second @*net-usage*))]
             (swap! *net-usage* (constantly curr-usage))
-            (assoc bandwidth :interval t-diff)))))
+            {:usage (second curr-usage)
+             :speed (assoc bandwidth :interval t-diff)}))))
 
 (defsig net-listen-addr
   "Returns the network address that is being listened to on the port"
