@@ -39,9 +39,16 @@
 (defmethod <clj String [obj] obj)
 (defmethod <clj Number [obj] obj)
 (defmethod <clj java.io.File [obj] obj)
-(defmethod <clj java.util.Map [obj] (reduce (fn [m pair]
-                                              (assoc m (first pair) (<clj (second pair))))
-                                            {} (seq obj)))
+(defmethod <clj java.util.HashMap [obj]
+  (reduce (fn [m pair]
+            (assoc m (.getKey pair) (.getValue pair)))
+          {} (seq obj)))
+
+#_(defmethod <clj java.util.Map [obj]
+  (reduce (fn [m pair]
+            (assoc m (first pair) (second pair)))
+          {} (seq obj)))
+
 (defmethod <clj java.util.List [obj] (map <clj obj))
 
 (defmethod <clj Object [obj]

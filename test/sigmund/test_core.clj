@@ -42,3 +42,7 @@
     ;;(defsig multi-process-memory [^String q] .getMultiProcMem)
     ;;(defsig net-service-name [protocol port] .getNetServicesName)
     ))
+
+
+(sig/ps-env)
+(sig/jvm-runtime)
