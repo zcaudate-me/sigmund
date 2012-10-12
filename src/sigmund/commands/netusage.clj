@@ -1,7 +1,7 @@
 (ns sigmund.commands.netusage
   (:import java.util.Date)
   (:use [sigmund.util :only [human-readable]])
-  (:require [sigmund.sigar :as sig]
+  (:require [sigmund.core :as sig]
             [clojure.pprint :as pp]))
 
 (def *network-status* (atom nil))

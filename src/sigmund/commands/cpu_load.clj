@@ -1,6 +1,6 @@
 (ns sigmund.commands.cpu-load
   (:use [sigmund.util :only [human-readable]])
-  (:require [sigmund.sigar :as sig]
+  (:require [sigmund.core :as sig]
             [clojure.pprint :as pp]))
 
 (def ATTRIBUTES [:name :user :system :wait :nice :irq :total :idle])

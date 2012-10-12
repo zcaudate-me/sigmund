@@ -1,6 +1,6 @@
 (ns sigmund.commands.free
   (:use [sigmund.util :only [up-shift human-readable]])
-  (:require [sigmund.sigar :as sig]
+  (:require [sigmund.core :as sig]
             [clojure.pprint :as pp]))
 
 (def ATTRIBUTES [:name :total :used :free :used-pct])

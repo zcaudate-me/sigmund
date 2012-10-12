@@ -213,6 +213,44 @@ It has wrappers for all the JMX Beans:
            :waited-count 0, :lock-name nil, :lock-owner-id -1, :blocked-count 0, :thread-name "Swank Worker Thread", :waited-time -1}
 
 
+## More Examples
+
+Examples of how easy it is to build system diagnostic tools can be seen in the sigmund.commands directory. These commands are ported over from the `org.hyperic.sigar.cmd` package. See http://www.hyperic.com/support/docs/sigar/. When the code needed to generate these commands are compared, sigmund wins hands down.
+
+    (use 'sigmund.commands.df)
+    (print-df)
+    ;; =>
+    ; ==============================================================================
+    ; :fs          | :total | :used | :free | :used-pct | :mounted     | :type      
+    ; ==============================================================================
+    ; /dev/disk0s1 | 196M   | 15M   | 181M  | 8%        | /Volumes/EFI | msdos/local
+    ; devfs        | 110K   | 110K  | 0     | 100%      | /dev         | devfs/none 
+    ; /dev/disk0s2 | 223G   | 198G  | 25G   | 89%       | /            | hfs/local  
+    ; ==============================================================================
+
+
+    (require '[sigmund.commands.free :as f])
+    (f/print-free)
+    ;; =>
+    ; ===========================================
+    ; :name  | :total | :used | :free | :used-pct
+    ; ===========================================
+    ; Memory | 4096M  | 4053M | 42M   | 72.4%    
+    ; Swap   | 2G     | 1G    | 967M  | 0.5%     
+    ; ===========================================
+
+
+    (require '[sigmund.commands.cpu-load :as cl])
+    (cl/print-cpu-load)
+    ;; =>
+    ; =================================================================
+    ; :name   | :user | :system | :wait | :nice | :irq | :total | :idle
+    ; =================================================================
+    ; AVERAGE | 59.7% | 9.1%    | 0.0%  | 0.0%  | 0.0% | 68.8%  | 31.2%
+    ; CPU 0   | 69.4% | 6.1%    | 0.0%  | 0.0%  | 0.0% | 75.5%  | 24.5%
+    ; CPU 1   | 50.0% | 12.0%   | 0.0%  | 0.0%  | 0.0% | 62.0%  | 38.0%
+    ; =================================================================
+
 ## License
 
 Copyright © 2012 Chris Zheng
