@@ -18,7 +18,7 @@ Sigmund is friendly clojure wrapper around the Hyperic SIGAR API http://www.hype
 
 In your project.clj, add to dependencies:
 
-     [sigmund "0.1.0"]
+     [sigmund "0.1.1"]
 
 Sigmund comes with included with native dependencies for MacOSX and Windows. Linux users will have to compile the native binaries and follow the intructions here: https://github.com/zcaudate/sigar-native-deps
 
