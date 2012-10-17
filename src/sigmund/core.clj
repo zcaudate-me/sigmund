@@ -1,5 +1,5 @@
 (ns sigmund.core
-  (:use [sigmund.util :only [<clj de-java]] )
+  (:use [sigmund.util :only [<clj de-java jmx-wrapper]] )
   (:import java.util.Date
            [java.net InetAddress]
            [java.lang.management ManagementFactory ClassLoadingMXBean CompilationMXBean
@@ -356,19 +356,6 @@
   ([] (ps-ancestors (pid))))
 
 ;; Threads
-
-
-;; JVM
-
-(defn- jmx-wrapper [interface impl]
-  (let [methods (.getMethods interface)
-        a-methods (filter (fn [x] (and (nil? (seq (.getParameterTypes x)))
-                                      (not= java.lang.Void/TYPE (.getReturnType x)))) methods)
-        names   (map (fn [x] (de-java (.getName x))) a-methods)
-        results (map (fn [x]
-                       (try (.invoke x impl nil)
-                            (catch Exception e nil))) a-methods)]
-    (zipmap (map keyword names) (map <clj results))))
 
 (defn jvm-runtime
   "Returns the jvm runtime status for the calling thread.

@@ -46,3 +46,7 @@
 
 (sig/ps-env)
 (sig/jvm-runtime)
+
+(def a (sig/cpu-usage))
+
+(:combined (first a))

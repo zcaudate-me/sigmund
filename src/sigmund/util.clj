@@ -33,6 +33,20 @@
                         (fn [x] (str "-" (lower-case x))))]
     hs))
 
+
+
+(defn de-get [m-str]
+  (decamelcase (st/replace m-str #"^get" "")))
+
+(defn de-is [m-str]
+  (str (decamelcase (st/replace m-str #"^is" "")) "?"))
+
+(defn de-java [m-str]
+  (cond (re-find #"^get[A-Z]" m-str) (de-get m-str)
+        (re-find #"^is[A-Z]" m-str) (de-is m-str)
+        :else (decamelcase m-str)))
+
+
 (defmulti <clj (fn [obj] (type obj)))
 (defmethod <clj nil [obj] obj)
 (defmethod <clj Boolean [obj] obj)
@@ -91,13 +105,35 @@
                        (cons (new clojure.lang.MapEntry (first pseq) (v (first pseq)))
                              (thisfn (rest pseq)))))) (keys pmap)))))))
 
-(defn de-get [m-str]
-  (decamelcase (st/replace m-str #"^get" "")))
 
-(defn de-is [m-str]
-  (str (decamelcase (st/replace m-str #"^is" "")) "?"))
-
-(defn de-java [m-str]
-  (cond (re-find #"^get[A-Z]" m-str) (de-get m-str)
-        (re-find #"^is[A-Z]" m-str) (de-is m-str)
-        :else (decamelcase m-str)))
+(defn jmx-wrapper [interface impl]
+  (let [methods (.getMethods interface)
+        a-methods (filter (fn [x] (and (nil? (seq (.getParameterTypes x)))
+                                      (not= java.lang.Void/TYPE (.getReturnType x)))) methods)
+        names   (map (fn [x] (-> (.getName x) de-java keyword)) a-methods)
+        result-fns (map
+                    (fn [x]
+                      (fn []
+                        (try (.invoke x impl nil)
+                             (catch Exception e nil)))) a-methods)
+        pmap (into {} (map vector names result-fns))
+        v (fn [k] ((pmap k)))
+        snapshot (fn []
+                   (reduce (fn [m e]
+                             (assoc m (key e) ((val e))))
+                           {} (seq pmap)))]
+    (proxy [clojure.lang.APersistentMap]
+        []
+      (containsKey [k] (contains? pmap k))
+      (entryAt [k] (when (contains? pmap k) (new clojure.lang.MapEntry k (v k))))
+      (valAt ([k] (when (contains? pmap k) (v k)))
+        ([k default] (if (contains? pmap k) (v k) default)))
+      (cons [m] (conj (snapshot) m))
+      (count [] (count pmap))
+      (assoc [k v] (assoc (snapshot) k v))
+      (without [k] (dissoc (snapshot) k))
+      (seq [] ((fn thisfn [plseq]
+                 (lazy-seq
+                   (when-let [pseq (seq plseq)]
+                     (cons (new clojure.lang.MapEntry (first pseq) (v (first pseq)))
+                           (thisfn (rest pseq)))))) (keys pmap))))))
