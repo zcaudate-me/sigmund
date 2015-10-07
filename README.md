@@ -24,7 +24,7 @@ Sigmund comes with included with native dependencies for MacOSX and Windows. Lin
 
 ## Usage
 
-The methods are pretty straight forward and comes with documentated code. Sigar itself has a few incomplete functionalities depending upon the platform that it is running. However, it adds alot more functionality than what the JMX provides. Below is a pretty comphrehensive summary of methods run on my machine, it give a good indication of the usefulness of the tool for system diagnosis.
+The methods are pretty straight forward and comes with documentated code. Sigar itself has a few incomplete functionalities depending upon the platform that it is running. However, it adds alot more functionality than what the JMX provides. Below is a pretty comprehensive summary of methods run on my machine, it give a good indication of the usefulness of the tool for system diagnosis.
 
     > (require '[sigmund.core :as sig])
 
